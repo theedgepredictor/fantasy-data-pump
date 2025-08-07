@@ -1,4 +1,4 @@
-name: Event Data trigger
+name: Fantasy Data trigger
 
 
 on:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  event_data_trigger:
+  fantasy_data_trigger:
     runs-on: ubuntu-latest
     steps:
       - name: checkout repo content
