@@ -39,6 +39,8 @@ def flatten_player_payload(payload: Dict[str, Any], season: int, week: int) -> D
             continue
         k = camel_to_snake(raw_k)
         row[f"actual_{k}"] = v
+        if k == 'receiving_receptions':
+            row["points"] = stats["points"] + v*0.5 # Shift from 1/2 PPR to Full to match other stats
 
     # Projected stats
     if "projected_points" in stats:
@@ -49,6 +51,8 @@ def flatten_player_payload(payload: Dict[str, Any], season: int, week: int) -> D
             continue
         k = camel_to_snake(raw_k)
         row[f"projected_{k}"] = v
+        if k == 'receiving_receptions':
+            row["projected_points"] = stats["projected_points"] + v*0.5 # Shift from 1/2 PPR to Full to match other stats
 
     return row
 
@@ -59,11 +63,11 @@ def get_weekly_free_agent_data(league: League, season: int, week: int) -> list:
     
     # Free agents by position with size limits
     position_limits = {
-        'RB': 100,
-        'WR': 100,
-        'QB': 40,
-        'TE': 40,
-        'K': 40,
+        'RB': 128,
+        'WR': 128,
+        'QB': 64,
+        'TE': 64,
+        'K': 64,
         'D/ST': 32
     }
 
@@ -93,3 +97,5 @@ def process_week_data(league_id: int, season: int, week: int, swid=None, espn_s2
     players.extend(free_agents)
 
     return players
+
+

@@ -37,7 +37,7 @@ def get_seasons_to_update(root_path, sport):
     """
     current_season = find_year_for_season(sport)
     if os.path.exists(f'{root_path}/{sport.value}'):
-        seasons = os.listdir(f'{root_path}/{sport.value}')
+        seasons = os.listdir(f'{root_path}/{sport.value}/projections')
         fs_season = -1
         for season_week in seasons:
             season = season_week.split('/')[0]
