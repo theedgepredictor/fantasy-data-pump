@@ -114,7 +114,8 @@ if __name__ == '__main__':
                     "clf": clf,
                     "meta": meta,
                 }
-                put_json_file(f"{watson_season_path}{player_id}.json", watson_obj)
+                ### Not doing. Too much bloat
+                #put_json_file(f"{watson_season_path}{player_id}.json", watson_obj)
                 watson_players.extend(flatten_watson_triplet(proj, clf, meta))
 
             season_watson_fantasy_players_df = pd.DataFrame(watson_players)
