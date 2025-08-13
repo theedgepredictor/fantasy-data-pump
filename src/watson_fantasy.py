@@ -3,7 +3,7 @@ import time
 import requests
 import pandas as pd
 
-def flatten_watson_triplet(proj, clf, meta):
+def flatten_watson_triplet(player_id,proj, clf, meta):
     """
     Flatten the triplet of Watson Fantasy Football projections, classifiers, and metadata into a single DataFrame.
     """
@@ -27,7 +27,7 @@ def flatten_watson_triplet(proj, clf, meta):
         flattened['week'] = m.get('EVENT_WEEK', None)
         flattened['opponent_name'] = m.get('OPPONENT_NAME', None)
         flattened['opposition_rank'] = m.get('OPPOSITION_RANK', None)
-        flattened['player_id'] = m.get('PLAYERID', None)
+        flattened['player_id'] = player_id
         flattened['full_name'] = m.get('FULL_NAME', None)
         flattened['position'] = m.get('POSITION', None)
         flattened['is_on_injured_reserve'] = m.get('IS_ON_INJURED_RESERVE', None)

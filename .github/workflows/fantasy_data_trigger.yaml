@@ -3,7 +3,7 @@ name: Fantasy Data trigger
 
 on:
   schedule:
-    - cron: '* 9 * * *' # runs at 9:00 UTC every day (4AM EST)
+    - cron: '0 9 * * *' # runs at 9:00 UTC every day (4AM EST)
   workflow_dispatch:
 
 jobs:
