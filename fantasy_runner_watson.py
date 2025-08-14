@@ -11,7 +11,7 @@ from src.utils import (
     get_dataframe,
     put_dataframe,
 )
-from src.watson_fantasy import fetch_watson_triplet, flatten_watson_triplet
+from src.watson_fantasy import fetch_watson_triplet, flatten_watson_triplet, select_watson_player_ids
 
 LEAGUE_ID = 2127  # not used here directly, but keep if helpful elsewhere
 
@@ -62,9 +62,9 @@ if __name__ == "__main__":
                 print(f"[Watson] {sport_league.value} {update_season}: No projections parquet found or empty at {projections_file}, skipping.")
                 continue
 
-            unique_players_for_watson = proj_df[proj_df.player_id.notnull()].player_id.astype("int64", errors="ignore").unique()
-
-            print(f"[Watson] {update_season}: {len(unique_players_for_watson)} players in projections;  fetching {len(unique_players_for_watson)}.")
+            ##### Watson only does the top 200ish players a week projection wise. Applying trim to avoid 404s
+            unique_players_for_watson = select_watson_player_ids(proj_df)
+            print(f"[Watson] {update_season}: {len(unique_players_for_watson)} players selected from projections;  from population {len(proj_df.player_id.unique())}.")
 
             watson_rows = []
             for player_id in unique_players_for_watson:

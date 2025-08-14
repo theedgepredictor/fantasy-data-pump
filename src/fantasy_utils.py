@@ -1,13 +1,14 @@
 import datetime
+import json
 import os
 import pandas as pd
-from typing import Any, Dict
+from typing import Any, Dict, List
 import re
 from .utils import put_json_file, get_dataframe, put_dataframe, camel_to_snake
-from espn_api.football import League
+from espn_api.football import League, BoxPlayer
 
 
-def flatten_player_payload(payload: Dict[str, Any], season: int, week: int) -> Dict[str, Any]:
+def flatten_player_payload(player, payload: Dict[str, Any], season: int, week: int) -> Dict[str, Any]:
     """Flattens a player's payload into a row for the dataframe"""
     row: Dict[str, Any] = {
         "season": season,
@@ -54,48 +55,86 @@ def flatten_player_payload(payload: Dict[str, Any], season: int, week: int) -> D
         if k == 'receiving_receptions':
             row["projected_points"] = stats["projected_points"] + v*0.5 # Shift from 1/2 PPR to Full to match other stats
 
+    ### inject additional player stats missed from box
+    try:
+        ppr_rank_data = player['player']['draftRanksByRankType']['PPR']
+        standard_rank_data = player['player']['draftRanksByRankType']['STANDARD']
+        row['PPR_draft_rank'] = ppr_rank_data.get('rank', 3000)
+        row['STANDARD_draft_rank'] = standard_rank_data.get('rank', 3000)
+        row['draft_auction_value'] = standard_rank_data.get('auctionValue', -1)
+    except Exception as e:
+        row['PPR_draft_rank'] = 3000
+        row['STANDARD_draft_rank'] = 3000
+        row['draft_auction_value'] = -1
+
+    try:
+        ppr_rank_data = player['player']['ownership']
+        row['community_ADP'] = ppr_rank_data.get('averageDraftPosition', 3000)
+    except Exception as e:
+        row['community_ADP'] = 3000
+
     return row
 
+def process_week_data(league_id: int, season: int, week: int, swid=None, espn_s2=None,chunk: int = 250):
+    """
+       Pull ALL players for a given season/week from ESPN's kona_player_info, paginating until exhausted.
+       Returns a list of flattened dict records (includes season, week, player_id).
+       """
+    print(f"[ESPN] Fetching season={season} week={week}")
 
-def get_weekly_free_agent_data(league: League, season: int, week: int) -> list:
-    """Gets free agent data for a given week"""
-    players = []
-    
-    # Free agents by position with size limits
-    position_limits = {
-        'RB': 128,
-        'WR': 128,
-        'QB': 64,
-        'TE': 64,
-        'K': 64,
-        'D/ST': 32
+    league = League(league_id=league_id, year=season, swid=swid, espn_s2=espn_s2)
+
+    # Needed to construct BoxPlayer objects for this week
+    pro_schedule = league._get_pro_schedule(week)
+    positional_rankings = league._get_positional_ratings(week)
+
+    params = {
+        "view": "kona_player_info",
+        "scoringPeriodId": week,
     }
 
-    for position, size in position_limits.items():
-        position_players = league.free_agents(week, size=size, position=position)
-        players.extend(position_players)
+    all_records: List[Dict[str, Any]] = []
+    seen_ids = set()  # guard against any dupes that sometimes appear in paging
 
-    # Flatten player data
-    return [flatten_player_payload(player.__dict__, season, week) for player in players]
+    offset = 0
+    while True:
+        filters = {
+            "players": {
+                "filterSlotIds": {"value": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,23,24]},
+                "filterRanksForScoringPeriodIds":{"value":[week]},
+                "limit": chunk,
+                "offset": offset,
+                "sortPercOwned": {"sortAsc": False, "sortPriority": 1},
+                "sortDraftRanks":{"sortPriority":100,"sortAsc":True,"value":"STANDARD"},
+                "filterRanksForRankTypes": {"value": ["PPR"]},
+                "filterRanksForSlotIds":{"value":[0,2,4,6,17,16,8,9,10,12,13,24,11,14,15]},
+            }
+        }
+        headers = {"x-fantasy-filter": json.dumps(filters)}
 
+        data = league.espn_request.league_get(params=params, headers=headers)
+        batch = data.get("players", []) or []
 
-def process_week_data(league_id: int, season: int, week: int, swid=None, espn_s2=None):
-    """Process data for a single week"""
-    print(f"Processing season {season}, week {week}")
-    
-    league = League(league_id=league_id, swid=swid, espn_s2=espn_s2, year=season)
-    players = []
+        print(f"[ESPN] page offset={offset} fetched={len(batch)}")
+        if not batch:
+            break
 
-    # Get rostered players
-    league.load_roster_week(week)
-    for team in league.teams:
-        roster = [flatten_player_payload(player.__dict__, season, week) for player in team.roster]
-        players.extend(roster)
+        # Build BoxPlayers and flatten
+        for p in batch:
+            bp = BoxPlayer(p, pro_schedule, positional_rankings, week, season)
+            rec = flatten_player_payload(p, bp.__dict__, season, week)
 
-    # Get free agents
-    free_agents = get_weekly_free_agent_data(league, season, week)
-    players.extend(free_agents)
+            # Only append if we have a player_id; skip any malformed rows
+            pid = rec.get("player_id")
+            if pid is None or pid in seen_ids:
+                continue
+            seen_ids.add(pid)
+            all_records.append(rec)
 
-    return players
+        # next page
+        offset += chunk
+
+    print(f"[ESPN] Done season={season} week={week} total_players={len(all_records)}")
+    return all_records
 
 
