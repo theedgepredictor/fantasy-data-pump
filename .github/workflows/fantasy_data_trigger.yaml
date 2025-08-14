@@ -21,7 +21,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Run Fantasy
-        run: python fantasy_runner.py
+        run: python fantasy_runner_projections.py
 
       - name: commit files
         run: |
